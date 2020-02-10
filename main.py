@@ -1,12 +1,12 @@
 from sys import argv
 from pprint import pprint
+import json
 import os
 import time
 import requests
 
 
 def main():
-    # 73eaea320bdc0d3299faa475c196cfea1c4df9da4c6d291633f9fe8f83c08c4de2a3abf89fbc3ed8a44e1
     API = 'https://api.vk.com/method/'
     TOKEN = os.getenv('TOKEN')
     VERSION = 5.52
@@ -133,8 +133,14 @@ def main():
         } for item in us['groups'].keys() if item in us['gids']]
         set_msg('Результат', f'Искомых групп: {len(result)}')
         pprint(result)
+        set_msg('Результат', 'Сохраненние в файл...')
+        with open(f'{UID}-groups.json', mode='w', encoding='utf-8') as f:
+            f.write(json.dumps(result))
+        set_msg('Результат', f'Результат успешно сохранен в файл {UID}-groups.json')
+
     else:
-        print('!!!')
+        set_msg('Результат', f'Данные для анализа отсутствуют')
+        return
 
 
 if __name__ == '__main__':
