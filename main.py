@@ -19,7 +19,7 @@ def main():
     if not TOKEN:
         TOKEN = input('Введите access_token:')
     if not UID:
-        UID = input('Введите user_id:')
+        UID = 'eshmargunov'
 
     def set_msg(label, msg):
         print(f'{time.time()} - {label}: {msg}')
@@ -135,7 +135,7 @@ def main():
         pprint(result)
         set_msg('Результат', 'Сохраненние в файл...')
         with open(f'{UID}-groups.json', mode='w', encoding='utf-8') as f:
-            f.write(json.dumps(result))
+            f.write(json.dumps(result, ensure_ascii=False))
         set_msg('Результат', f'Результат успешно сохранен в файл {UID}-groups.json')
 
     else:
