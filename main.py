@@ -70,7 +70,7 @@ class SpyGames:
                 error = response.json()['error']
                 er_code = error['error_code']
                 er_msg = error['error_msg']
-                if er_code == 6:
+                if er_code == 6 or er_code == 1:
                     self.request_state = 1
                     self._send_message('Слишком много запросов. Встаем на паузу на секунду')
                     time.sleep(1)
