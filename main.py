@@ -89,7 +89,7 @@ class SpyGames:
         self._set_program_state('Получение данных о группах пользователя')
         self.user['groups'] = {
             item['id']: item for item in filter(
-                lambda x: x.get('type', False) == 'page',
+                lambda x: x.get('type', False) == 'page' or 'group' or 'event',
                 response['groups'])
         }
         self.user['group_ids'] = {item for item in self.user['groups'].keys()}
@@ -229,3 +229,4 @@ class SpyGames:
 
 if __name__ == '__main__':
     user = SpyGames(TOKEN, USER_ID)
+
