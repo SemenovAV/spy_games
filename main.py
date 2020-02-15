@@ -114,7 +114,7 @@ class SpyGames:
         Метод отфильтровывает из ответа сервера активных пользователей
 
         '''
-        self._set_program_state('Получение данных о друзьях пользователя')
+        self._set_program_state ('Получение данных о друзьях пользователя')
         self.user['friends'] = {
             item['id']: item for item in filter(
                 lambda x: not x.get('deactivated', False),
@@ -122,7 +122,9 @@ class SpyGames:
             )
         }
         self.user['friend_ids'] = {item for item in self.user['friends'].keys()}
-        self._send_message(f'Друзья: {len(self.user["friend_ids"])}.')
+        self._send_message(f'Друзья: {len(response["friends"])} '
+                           f'\n    активных: {len(self.user["friend_ids"])} \u00a0\u2713\u00a0'
+                           f'\n    неактивных(страница удалена или забанена и учтена не будет): {len(response["friends"]) - len(self.user["friend_ids"])} \u00a0\u2717\u00a0')
 
     def _get_user(self):
         '''
@@ -230,7 +232,7 @@ class SpyGames:
         '''
         self._set_program_state('Проверка конфигурации')
         if TOKEN:
-            self._send_message('access_token:\u00a0\u2713\u00a0   ')
+            self._send_message('access_token\u00a0\u2713\u00a0   ')
             return True
         self._send_message('access_token не найден. Проверьте access_token и попробуйте снова. ')
 
@@ -239,7 +241,7 @@ class SpyGames:
 
         '''
         if USER_ID:
-            self._send_message(f'user_id:\u00a0\u2713\u00a0')
+            self._send_message(f'user_id\u00a0\u2713\u00a0')
             return True
         self._send_message(f'user_id не найден. Проверьте user_id и попробуйте снова.')
 
