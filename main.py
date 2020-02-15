@@ -10,7 +10,7 @@ import requests
 и id нужного пользователя в переменную USER_ID
 '''
 TOKEN = ''
-USER_ID = 'eshmargunov'
+USER_ID = ''
 
 
 class SpyGames:
@@ -97,13 +97,13 @@ class SpyGames:
 
     def _filter_groups(self, response):
         '''
-        Метод отфильтровывает из ответа сервера подписки пользователя тип которых - группа.
+        Метод отфильтровывает из ответа сервера активные группы.
 
         '''
         self._set_program_state('Получение данных о группах пользователя')
         self.user['groups'] = {
             item['id']: item for item in filter(
-                lambda x: x.get('type', False) == 'page' or 'group' or 'event',
+                lambda x: not x.get('deactivated', False),
                 response['groups'])
         }
         self.user['group_ids'] = {item for item in self.user['groups'].keys()}
@@ -137,7 +137,7 @@ class SpyGames:
                                          'var id = user[0].id;'
                                          'return {'
                                          '"user": user,'
-                                         '"groups": API.users.getSubscriptions({'
+                                         '"groups": API.groups.get({'
                                          '"user_id": id ,'
                                          '"extended": 1,'
                                          '"fields": "members_count"'
@@ -150,11 +150,11 @@ class SpyGames:
             self._send_message(f'{er} \nЗавершение работы программы.')
 
             return False
-
         if response['user']:
             self.user = response['user'][0]
             self._set_program_state('Обработка данных')
-            self._send_message(f'Данные пользователя {self.user_id} получены.')
+
+            self._send_message(f'Данные пользователя {self.user["first_name"]} {self.user["last_name"]} получены.')
 
             if response['groups']:
                 self._filter_groups(response)
@@ -172,7 +172,7 @@ class SpyGames:
         self._send_message('Подготовка дополнительных запросов.')
 
         requests_list = list(
-            ('API.users.getSubscriptions({"user_id":' + str(item) + '}).groups.items,' for item in
+            ('API.groups.get({"user_id":' + str(item) + '}).items,' for item in
              user_ids)
         )
         self._send_message(f'Подготовлено {len(requests_list)} дополнительных запросов')
@@ -250,7 +250,7 @@ class SpyGames:
         Метод выполняет запрос информации о пользователе. Разбор полученной информации.
 
         '''
-        self._set_program_state('Начало работы')
+        self._set_program_state('Начало работы\b')
         self._send_message('')
         if not self._check_token() or not self._check_uid():
             return
