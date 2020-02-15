@@ -13,7 +13,7 @@ from tools.visual_state import visual_state
 Для работы скрипта нужно вставить access_token  API ВК в переменную TOKEN 
 и id нужного пользователя в переменную USER_ID
 '''
-TOKEN = '73eaea320bdc0d3299faa475c196cfea1c4df9da4c6d291633f9fe8f83c08c4de2a3abf89fbc3ed8a44e1'
+TOKEN = ''
 USER_ID = 'eshmargunov'
 
 
