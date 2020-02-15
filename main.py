@@ -1,8 +1,12 @@
-from pprint import pprint
 import json
 import time
-from progressbar import ProgressBar
+from pprint import pprint
+
 import requests
+
+from tools.mini_progress import mini_progress
+from tools.progressbar import ProgressBar
+from tools.visual_state import visual_state
 
 '''
 Скрипт выводит список групп в ВК в которых состоит пользователь, но не состоит никто из его друзей
@@ -33,12 +37,17 @@ class SpyGames:
         self.result = []
         self.go()
 
-    def _send_message(self, message):
+    def _send_message(self, message, state=None):
         '''
         Метод формирует и печатает сообщение в консоль.
 
         '''
-        print(f'{time.time()} - {self.program_state}: {message}')
+        generated_message = f'{time.time()} - {self.program_state}: {message}'
+        if state != None:
+            mini_progress(generated_message)
+            visual_state(generated_message, state)
+        else:
+            print(generated_message)
 
     def _set_program_state(self, state):
         '''
@@ -48,6 +57,11 @@ class SpyGames:
 
         '''
         self.program_state = state
+
+    def set_timeout(self):
+        self.timeout += 1
+        self._set_program_state('Подключение')
+        mini_progress('Ожидание', 1)
 
     def _api_execute(self, code):
         '''
@@ -73,11 +87,10 @@ class SpyGames:
                 )
             except requests.exceptions.Timeout:
                 self.request_state = 1
-                self.timeout += 1
-                time.sleep(1)
+                self.set_timeout(1)
                 continue
             except requests.exceptions.ConnectionError:
-                self._send_message('Ошибка сети')
+                self._send_message('Ошибка сети', state=False)
                 raise ConnectionError('Неработает')
             if response.json().get('error', False):
                 error = response.json()['error']
@@ -85,11 +98,12 @@ class SpyGames:
                 er_msg = error['error_msg']
                 if er_code == 6 or er_code == 1:
                     self.request_state = 1
-                    self._send_message('Слишком много запросов. Встаем на паузу на секунду')
-                    time.sleep(1)
+                    self._send_message('Слишком много запросов.', state=False)
+                    self._send_message('Встаем на паузу на секунду', state=True)
+                    self.set_timeout(1)
                 else:
                     self._set_program_state(f'Ошибка {er_code}')
-                    self._send_message(er_msg)
+                    self._send_message(er_msg, state=False)
                     raise Exception('Проверте access_token')
             else:
                 data = response.json().get('response', False)
@@ -107,14 +121,14 @@ class SpyGames:
                 response['groups'])
         }
         self.user['group_ids'] = {item for item in self.user['groups'].keys()}
-        self._send_message(f'Группы: {len(self.user["group_ids"])}.')
+        self._send_message(f'Группы: {len(self.user["group_ids"])}.', state=True)
 
     def _filter_friends(self, response):
         '''
         Метод отфильтровывает из ответа сервера активных пользователей
 
         '''
-        self._set_program_state ('Получение данных о друзьях пользователя')
+        self._set_program_state('Получение данных о друзьях пользователя')
         self.user['friends'] = {
             item['id']: item for item in filter(
                 lambda x: not x.get('deactivated', False),
@@ -122,15 +136,19 @@ class SpyGames:
             )
         }
         self.user['friend_ids'] = {item for item in self.user['friends'].keys()}
-        self._send_message(f'Друзья: {len(response["friends"])} '
-                           f'\n    активных: {len(self.user["friend_ids"])} \u00a0\u2713\u00a0'
-                           f'\n    неактивных(страница удалена или забанена и учтена не будет): {len(response["friends"]) - len(self.user["friend_ids"])} \u00a0\u2717\u00a0')
+        self._send_message(f'Друзья: {len(response["friends"])}', state=True)
+        self._set_program_state('Обработка данных')
+        self._send_message(f'Активных аккаунтов: {len(self.user["friend_ids"])}', state=True)
+        self._send_message(
+            f'Неактивных аккаунтов(страница удалена или забанена и учтена не будет): {len(response["friends"]) - len(self.user["friend_ids"])}',
+            state=True)
 
     def _get_user(self):
         '''
         Метод отправляет запрос к API VK. Возвращает словарь с характеристиками пользователя.
         '''
         user_id = f'"{self.user_id}"' if not isinstance(self.user_id, int) else self.user_id
+        self._set_program_state('Получение данных')
         try:
             response = self._api_execute(f'var uid = {user_id};'
                                          ' var user = API.users.get({"user_ids": uid});'
@@ -144,8 +162,10 @@ class SpyGames:
                                          '}).items,'
                                          '"friends": API.friends.get({"user_id": id , "fields":"last_seen"}).items,'
                                          '};')
+            self._send_message('Отправка запроса', state=True)
 
         except Exception as er:
+            self._send_message('Отправка запроса', state=False)
             self._set_program_state('Ошибка')
             self._send_message(f'{er} \nЗавершение работы программы.')
 
@@ -154,7 +174,8 @@ class SpyGames:
             self.user = response['user'][0]
             self._set_program_state('Обработка данных')
 
-            self._send_message(f'Данные пользователя {self.user["first_name"]} {self.user["last_name"]} получены.')
+            self._send_message(f'Данные пользователя {self.user["first_name"]} {self.user["last_name"]} получены.',
+                               state=True)
 
             if response['groups']:
                 self._filter_groups(response)
@@ -169,37 +190,30 @@ class SpyGames:
 
         '''
         self._set_program_state('Обработка данных')
-        self._send_message('Подготовка дополнительных запросов.')
 
         requests_list = list(
             ('API.groups.get({"user_id":' + str(item) + '}).items,' for item in
              user_ids)
         )
-        self._send_message(f'Подготовлено {len(requests_list)} дополнительных запросов')
+        self._send_message('Подготовка дополнительных запросов.', state=requests_list)
+        if len(requests_list) > 0:
+            self._send_message(f'Подготовлено {len(requests_list)} дополнительных запросов')
+            one_percent = len(requests_list) / 100
+            progressbar = ProgressBar(60)
 
-        one_percent = len(requests_list) / 100
-        progressbar = ProgressBar(55)
+            while requests_list:
+                temp_list = requests_list[:25]
+                requests_list = requests_list[25:]
+                requests = ''.join(temp_list)
+                percent = len(temp_list) / one_percent
 
-        while requests_list:
-            temp_list = requests_list[:25]
-            requests_list = requests_list[25:]
-            requests = ''.join(temp_list)
-            percent = len(temp_list) / one_percent
-
-            request = self._api_execute(f'return [{requests}];')
-            for item in request:
-                if item:
-                    length = len(self.users_subscription)
-                    self._set_program_state('Запрос данных')
-                    self._send_message(f'Получено {len(item)} group_ids')
-
-                    for el in item:
-                        self.users_subscription.add(el)
-                    self._set_program_state('Обработка данных')
-                    self._send_message(f'Добавлено {len(self.users_subscription) - length} group_ids')
-
-            progressbar.set_progress(percent)
-        self._send_message(f'Всего добавлено {len(self.users_subscription)} уникальных group_id')
+                request = self._api_execute(f'return [{requests}];')
+                for item in request:
+                    if item:
+                        for el in item:
+                            self.users_subscription.add(el)
+                progressbar.set_progress(percent)
+            self._send_message(f'Добавлено {len(self.users_subscription)} уникальных group_id')
 
     def get_result(self):
         '''
@@ -220,11 +234,16 @@ class SpyGames:
         Метод сохраняет результат работы скрипта в файл
 
         '''
-        self._send_message('Сохраненние в файл...')
 
-        with open(filename, mode='w', encoding='utf-8') as f:
-            f.write(json.dumps(self.result, ensure_ascii=False))
-            self._send_message(f'Результат успешно сохранен в файл {filename}')
+        try:
+            with open(filename, mode='w', encoding='utf-8') as f:
+                f.write(json.dumps(self.result, ensure_ascii=False))
+                self._send_message('Сохраненние в файл', state=True)
+                self._send_message(f'Результат успешно сохранен в файл {filename}')
+
+        except Exception as e:
+            self._send_message('Сохраненние в файл', state=False)
+            self._send_message(f'Ошибка: {e}', state=False)
 
     def _check_token(self):
         ''' Метод проверяет что переменная TOKEN не пустая.
@@ -232,26 +251,26 @@ class SpyGames:
         '''
         self._set_program_state('Проверка конфигурации')
         if TOKEN:
-            self._send_message('access_token\u00a0\u2713\u00a0   ')
+            self._send_message('access_token', state=True)
             return True
-        self._send_message('access_token не найден. Проверьте access_token и попробуйте снова. ')
+        self._send_message('access_token не найден. Проверьте access_token и попробуйте снова.', state=False)
 
     def _check_uid(self):
         ''' Метод проверяет что переменная USER_ID не пустая.
 
         '''
         if USER_ID:
-            self._send_message(f'user_id\u00a0\u2713\u00a0')
+            self._send_message('user_id', state=True)
             return True
-        self._send_message(f'user_id не найден. Проверьте user_id и попробуйте снова.')
+        self._send_message(f'user_id не найден. Проверьте user_id и попробуйте снова.', state=False)
 
     def go(self):
         '''
         Метод выполняет запрос информации о пользователе. Разбор полученной информации.
 
         '''
-        self._set_program_state('Начало работы\b')
-        self._send_message('')
+        self._set_program_state('')
+        self._send_message('Начало работы')
         if not self._check_token() or not self._check_uid():
             return
         if self._get_user():
@@ -262,7 +281,7 @@ class SpyGames:
                 self.save_file(f'{self.user_id}-groups.json')
             else:
                 self._set_program_state('Результат')
-                self._send_message(f'Данные для анализа отсутствуют')
+                self._send_message(f'Данные для анализа отсутствуют', state=False)
                 return
 
 
