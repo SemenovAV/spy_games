@@ -14,7 +14,7 @@ from tools.visual_state import visual_state
 и id нужного пользователя в переменную USER_ID
 '''
 TOKEN = ''
-USER_ID = 'eshmargunov'
+USER_ID = ''
 
 
 class SpyGames:
@@ -37,15 +37,17 @@ class SpyGames:
         self.result = []
         self.go()
 
-    def _send_message(self, message, state=None):
+    def _send_message(self, message, state=None, progress=0):
         '''
         Метод формирует и печатает сообщение в консоль.
 
         '''
         generated_message = f'{time.time()} - {self.program_state}: {message}'
-        if state != None:
+        if state is not None:
             mini_progress(generated_message)
             visual_state(generated_message, state)
+        elif progress:
+            mini_progress(generated_message, progress)
         else:
             print(generated_message)
 
@@ -66,7 +68,7 @@ class SpyGames:
         '''
         self.timeout += 1
         self._set_program_state('Подключение')
-        mini_progress('Ожидание', sec)
+        self._send_message('', progress=sec)
 
     def _api_execute(self, code):
         '''
@@ -83,13 +85,15 @@ class SpyGames:
         self.timeout = 0
         while self.request_state == 1:
             if self.timeout == 3:
-                raise TimeoutError('Неработает')
+                raise TimeoutError('Данные не получены.')
             self.request_state = 0
             try:
+
                 response = requests.get(
                     f'{self.api}execute',
                     params=params
                 )
+                self.timeout = 0
             except requests.exceptions.Timeout:
                 self.request_state = 1
                 self._set_timeout(1)
@@ -97,7 +101,7 @@ class SpyGames:
                 continue
             except requests.exceptions.ConnectionError:
                 self._send_message('Ошибка сети', state=False)
-                raise ConnectionError('Неработает')
+                raise ConnectionError('Сеть неработает')
             if response.json().get('error', False):
                 error = response.json()['error']
                 er_code = error['error_code']
@@ -107,10 +111,14 @@ class SpyGames:
                     self._send_message('Слишком много запросов.', state=False)
                     self._send_message('Встаем на паузу на секунду', state=True)
                     self._set_timeout(1)
-                else:
+                elif er_code == 5:
                     self._set_program_state(f'Ошибка {er_code}')
                     self._send_message(er_msg, state=False)
                     raise Exception('Проверте access_token')
+                else:
+                    self._set_program_state(f'Ошибка {er_code}')
+                    self._send_message(er_msg, state=False)
+
             else:
                 data = response.json().get('response', False)
                 return data
@@ -210,10 +218,9 @@ class SpyGames:
             while requests_list:
                 temp_list = requests_list[:25]
                 requests_list = requests_list[25:]
-                requests = ''.join(temp_list)
+                _requests = ''.join(temp_list)
                 percent = len(temp_list) / one_percent
-
-                request = self._api_execute(f'return [{requests}];')
+                request = self._api_execute(f'return [{_requests}];')
                 for item in request:
                     if item:
                         for el in item:
@@ -281,7 +288,13 @@ class SpyGames:
             return
         if self._get_user():
             if self.user and self.user.get('friend_ids', False) and self.user.get('group_ids', False):
-                self._get_users_subscription(self.user['friend_ids'])
+                try:
+                    self._get_users_subscription(self.user['friend_ids'])
+                except Exception as e:
+                    self._set_program_state('Ошибка')
+                    self._send_message(f'{e} \nЗавершение работы программы.')
+                    return False
+
                 self.get_result()
                 pprint(self.result)
                 self.save_file(f'{self.user_id}-groups.json')
