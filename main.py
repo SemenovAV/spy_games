@@ -28,6 +28,7 @@ class SpyGames:
         self.user = None
         self.program_state = None
         self.request_state = 0
+        self.timeout = 0
         self.users_subscription = set()
         self.result = []
         self.go()
@@ -60,12 +61,24 @@ class SpyGames:
             'code': code
         }
         self.request_state = 1
+        self.timeout = 0
         while self.request_state == 1:
+            if self.timeout == 2:
+                raise TimeoutError('Неработает')
             self.request_state = 0
-            response = requests.get(
-                f'{self.api}execute',
-                params=params
-            )
+            try:
+                response = requests.get(
+                    f'{self.api}execute',
+                    params=params
+                )
+            except requests.exceptions.Timeout:
+                self.request_state = 1
+                self.timeout += 1
+                time.sleep(1)
+                continue
+            except requests.exceptions.ConnectionError:
+                self._send_message('Ошибка сети')
+                raise ConnectionError('Неработает')
             if response.json().get('error', False):
                 error = response.json()['error']
                 er_code = error['error_code']
@@ -77,6 +90,7 @@ class SpyGames:
                 else:
                     self._set_program_state(f'Ошибка {er_code}')
                     self._send_message(er_msg)
+                    raise Exception('Проверте access_token')
             else:
                 data = response.json().get('response', False)
                 return data
@@ -131,9 +145,10 @@ class SpyGames:
 
         except Exception as er:
             self._set_program_state('Ошибка')
-            self._send_message('Завершение работы программы.')
+            self._send_message(f'{er} \nЗавершение работы программы.')
 
             return False
+
         if response['user']:
             self.user = response['user'][0]
             self._set_program_state('Обработка данных')
@@ -209,24 +224,45 @@ class SpyGames:
             f.write(json.dumps(self.result, ensure_ascii=False))
             self._send_message(f'Результат успешно сохранен в файл {filename}')
 
+    def _check_token(self):
+        ''' Метод проверяет что переменная TOKEN не пустая.
+
+        '''
+        self._set_program_state('Проверка конфигурации')
+        if TOKEN:
+            self._send_message('access_token:\u00a0\u2713\u00a0   ')
+            return True
+        self._send_message('access_token не найден. Проверьте access_token и попробуйте снова. ')
+
+    def _check_uid(self):
+        ''' Метод проверяет что переменная USER_ID не пустая.
+
+        '''
+        if USER_ID:
+            self._send_message(f'user_id:\u00a0\u2713\u00a0')
+            return True
+        self._send_message(f'user_id не найден. Проверьте user_id и попробуйте снова.')
+
     def go(self):
         '''
         Метод выполняет запрос информации о пользователе. Разбор полученной информации.
 
         '''
         self._set_program_state('Начало работы')
-        self._get_user()
-        if self.user and self.user.get('friend_ids', False) and self.user.get('group_ids', False):
-            self._get_users_subscription(self.user['friend_ids'])
-            self.get_result()
-            pprint(self.result)
-            self.save_file(f'{self.user_id}-groups.json')
-        else:
-            self._set_program_state('Результат')
-            self._send_message(f'Данные для анализа отсутствуют')
+        self._send_message('')
+        if not self._check_token() or not self._check_uid():
             return
+        if self._get_user():
+            if self.user and self.user.get('friend_ids', False) and self.user.get('group_ids', False):
+                self._get_users_subscription(self.user['friend_ids'])
+                self.get_result()
+                pprint(self.result)
+                self.save_file(f'{self.user_id}-groups.json')
+            else:
+                self._set_program_state('Результат')
+                self._send_message(f'Данные для анализа отсутствуют')
+                return
 
 
 if __name__ == '__main__':
     user = SpyGames(TOKEN, USER_ID)
-
