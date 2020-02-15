@@ -13,8 +13,8 @@ from tools.visual_state import visual_state
 Для работы скрипта нужно вставить access_token  API ВК в переменную TOKEN 
 и id нужного пользователя в переменную USER_ID
 '''
-TOKEN = ''
-USER_ID = ''
+TOKEN = '73eaea320bdc0d3299faa475c196cfea1c4df9da4c6d291633f9fe8f83c08c4de2a3abf89fbc3ed8a44e1'
+USER_ID = 'eshmargunov'
 
 
 class SpyGames:
@@ -58,10 +58,15 @@ class SpyGames:
         '''
         self.program_state = state
 
-    def set_timeout(self):
+    def _set_timeout(self, sec):
+        ''' Метод запускает анимацию ожидания и ставит
+        скрипт на паузу равную продолжительности анимации.
+        Продолжительность в секундах передается единственным аргументом
+
+        '''
         self.timeout += 1
         self._set_program_state('Подключение')
-        mini_progress('Ожидание', 1)
+        mini_progress('Ожидание', sec)
 
     def _api_execute(self, code):
         '''
@@ -77,7 +82,7 @@ class SpyGames:
         self.request_state = 1
         self.timeout = 0
         while self.request_state == 1:
-            if self.timeout == 2:
+            if self.timeout == 3:
                 raise TimeoutError('Неработает')
             self.request_state = 0
             try:
@@ -87,7 +92,8 @@ class SpyGames:
                 )
             except requests.exceptions.Timeout:
                 self.request_state = 1
-                self.set_timeout(1)
+                self._set_timeout(1)
+
                 continue
             except requests.exceptions.ConnectionError:
                 self._send_message('Ошибка сети', state=False)
@@ -100,7 +106,7 @@ class SpyGames:
                     self.request_state = 1
                     self._send_message('Слишком много запросов.', state=False)
                     self._send_message('Встаем на паузу на секунду', state=True)
-                    self.set_timeout(1)
+                    self._set_timeout(1)
                 else:
                     self._set_program_state(f'Ошибка {er_code}')
                     self._send_message(er_msg, state=False)
