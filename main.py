@@ -35,6 +35,8 @@ class SpyGames:
         self.timeout = 0
         self.users_subscription = set()
         self.result = []
+        self.start_time = 0
+        self.end_time = 0
         self.go()
 
     def _send_message(self, message, state=None, progress=0):
@@ -42,7 +44,7 @@ class SpyGames:
         Метод формирует и печатает сообщение в консоль.
 
         '''
-        generated_message = f'{time.time()} - {self.program_state}: {message}'
+        generated_message = f'{round(time.time() - self.start_time, 4)} - {self.program_state}: {message}'
         if state is not None:
             mini_progress(generated_message)
             visual_state(generated_message, state)
@@ -282,9 +284,13 @@ class SpyGames:
         Метод выполняет запрос информации о пользователе. Разбор полученной информации.
 
         '''
-        self._set_program_state('')
-        self._send_message('Начало работы')
+        self.start_time = time.time()
+        self._set_program_state('Начало работы')
+        self._send_message(f'{time.ctime(self.start_time)}')
         if not self._check_token() or not self._check_uid():
+            self._set_program_state('Окончание работы')
+            self._send_message(f'{time.ctime()}')
+            self._send_message(f'{time.time() - self.start_time}')
             return
         if self._get_user():
             if self.user and self.user.get('friend_ids', False) and self.user.get('group_ids', False):
@@ -293,14 +299,24 @@ class SpyGames:
                 except Exception as e:
                     self._set_program_state('Ошибка')
                     self._send_message(f'{e} \nЗавершение работы программы.')
+                    self._set_program_state('Окончание работы')
+                    self._send_message(f'{time.ctime()}')
+                    self._send_message(f'{time.time() - self.start_time}')
+                    self._send_message(f'Время работы скрипта: {round(time.time() - self.start_time, 4)} секунд')
                     return False
 
                 self.get_result()
                 pprint(self.result)
                 self.save_file(f'{self.user_id}-groups.json')
+                self._set_program_state('Окончание работы')
+                self._send_message(f'{time.ctime()}')
+                self._send_message(f'Время работы скрипта: {round(time.time() - self.start_time, 4)} секунд')
             else:
                 self._set_program_state('Результат')
                 self._send_message(f'Данные для анализа отсутствуют', state=False)
+                self._set_program_state('Окончание работы')
+                self._send_message(f'{time.ctime()}')
+                self._send_message(f'Время работы скрипта: {round(time.time() - self.start_time, 4)} секунд')
                 return
 
 
